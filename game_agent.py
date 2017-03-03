@@ -171,23 +171,37 @@ class CustomPlayer:
         """
         if self.time_left() < self.TIMER_THRESHOLD:
             raise Timeout()
+        
+        squares = game.get_legal_moves()
+        if not squares:
+            return -999, (-1,-1)
+        choices = [game.forecast_move(move) for move in squares]
+              
+        # Set which player the agent is maximizing for, so that
+        #    agent can calculate utility of moves correctly
+        if maximizing_player:
+            boss = game.active_player
+        else:
+            boss = game.inactive_player
             
+        if choices[0].move_count - 2 >= depth:
+            outcomes = [self.score(choice, boss) for choice in choices]
+        else:
+            outcomes = [self.min_val(choice, depth, boss) for choice in choices]
         
-        ap = game.active_player
-        
-        
-        if depth == 1:
-            squares = game.get_legal_moves(ap)
-            print(squares[0])
-            states = [game.forecast_move(sq) for sq in squares]
-            scores = [self.score(state, ap) for state in states]
-            return max(scores), squares[scores.index(max(scores))]
-        
-        # TODO: finish this function!
-        #for ply in range(depth):
-         #   ap = active_player(game)
-            
-        #raise NotImplementedError
+        return max(zip(outcomes, squares), key=lambda x: x[0])
+    
+    def min_val(self, game, maxDepth, target):
+        choices = [game.forecast_move(move) for move in game.get_legal_moves()]
+        if choices[0].move_count - 2 >= maxDepth:
+            return min(self.score(choice, target) for choice in choices)
+        return min(self.max_val(choice, maxDepth, target) for choice in choices)
+    
+    def max_val(self, game, maxDepth, target):
+        choices = [game.forecast_move(move) for move in game.get_legal_moves()]
+        if choices[0].move_count - 2 >= maxDepth:
+            return max(self.score(choice, target) for choice in choices)
+        return max(self.min_val(choice, maxDepth, target) for choice in choices)
 
     def alphabeta(self, game, depth, alpha=float("-inf"), beta=float("inf"), maximizing_player=True):
         """Implement minimax search with alpha-beta pruning as described in the
@@ -230,5 +244,22 @@ class CustomPlayer:
         if self.time_left() < self.TIMER_THRESHOLD:
             raise Timeout()
 
-        # TODO: finish this function!
-        raise NotImplementedError
+        squares = game.get_legal_moves()
+        if not squares:
+            return -999, (-1,-1)
+        choices = [game.forecast_move(move) for move in squares]
+              
+        # Set which player the agent is maximizing for, so that
+        #    agent can calculate utility of moves correctly
+        if maximizing_player:
+            boss = game.active_player
+        else:
+            boss = game.inactive_player
+            
+        if choices[0].move_count - 2 >= depth:
+            outcomes = [self.score(choice, boss) for choice in choices]
+        else:
+            outcomes = [self.min_val(choice, depth, boss) for choice in choices]
+        
+        return max(zip(outcomes, squares), key=lambda x: x[0])
+ 
