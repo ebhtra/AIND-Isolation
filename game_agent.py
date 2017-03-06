@@ -243,23 +243,70 @@ class CustomPlayer:
         """
         if self.time_left() < self.TIMER_THRESHOLD:
             raise Timeout()
-
-        squares = game.get_legal_moves()
-        if not squares:
-            return -999, (-1,-1)
-        choices = [game.forecast_move(move) for move in squares]
-              
-        # Set which player the agent is maximizing for, so that
-        #    agent can calculate utility of moves correctly
-        if maximizing_player:
-            boss = game.active_player
-        else:
-            boss = game.inactive_player
-            
-        if choices[0].move_count - 2 >= depth:
-            outcomes = [self.score(choice, boss) for choice in choices]
-        else:
-            outcomes = [self.min_val(choice, depth, boss) for choice in choices]
         
-        return max(zip(outcomes, squares), key=lambda x: x[0])
- 
+        if maximizing_player:
+            return self.max_alpha_beta(game, depth, alpha, beta)
+
+        return self.min_alpha_beta(game, depth, alpha, beta)
+            
+
+    def max_alpha_beta(self, game, depth, a, b):
+        
+        moves = game.get_legal_moves()
+        if not moves:
+            return -float('inf'), (-1,-1)
+        
+        if depth == 1:
+            best_score, best_move = a, (-1,-1)
+            for move in moves:
+                board = game.forecast_move(move)
+                score = self.score(board, board.inactive_player)
+                if score >= b:
+                    return score, move
+                if score > best_score:
+                    best_score, best_move = score, move
+                    a = best_score
+            return best_score, best_move
+        
+#        best_score = a
+        best_move = (-1,-1)
+        for move in moves:
+            board = game.forecast_move(move)
+            score, _ = self.min_alpha_beta(board, depth-1, a, b)
+            if score >= b:
+                return score, move
+            if score > a:
+                a, best_move = score, move
+        return a, best_move
+    
+    def min_alpha_beta(self, game, depth, a, b):
+        
+        moves = game.get_legal_moves()
+        if not moves:
+            return float('inf'), (-2,-2)
+        
+        if depth == 1:
+            best_score, best_move = b, (-2,-2)
+            for move in moves:
+                board = game.forecast_move(move)
+                score = self.score(board, board.active_player)
+                if score <= a:
+                    return score, move
+                if score < best_score:
+                    best_score, best_move = score, move
+                    b = best_score
+            return best_score, best_move
+        
+#        best_score = b
+        best_move = (-2,-2)
+        for move in moves:
+            board = game.forecast_move(move)
+            score, square = self.max_alpha_beta(board, depth-1, a, b)
+            if score <= a:
+                return score, square
+            if score < b:
+                b, best_move = score, square
+        return b, best_move
+    
+                
+#   
