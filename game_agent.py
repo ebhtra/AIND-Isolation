@@ -117,26 +117,45 @@ class CustomPlayer:
         """
 
         self.time_left = time_left
-
-        # TODO: finish this function!
-
+        
+        if not legal_moves:
+            return (-1,-1)
+        best_move = legal_moves[0]
+        best_score = -float('inf')
+        depth = 0
+        method_map = {'minimax': self.minimax, 'alphabeta': self.alphabeta}
+        
         # Perform any required initializations, including selecting an initial
         # move from the game board (i.e., an opening book), or returning
         # immediately if there are no legal moves
 
         try:
+            
+            while(self.iterative or depth < self.search_depth):
+                
+                depth += 1
+                print('DEPTH is ' + str(depth))
+                for move in legal_moves:
+                    state = game.forecast_move(move)
+                    score, _ = method_map[self.method](state, depth, 
+                                         maximizing_player=False)
+                    if score > best_score:
+                        print(score, move)
+                        best_score, best_move = score, move
+            return best_move   
             # The search method call (alpha beta or minimax) should happen in
             # here in order to avoid timeout. The try/except block will
             # automatically catch the exception raised by the search method
             # when the timer gets close to expiring
-            pass
+            
 
         except Timeout:
             # Handle any actions required at timeout, if necessary
-            pass
+            print('dude--reached Timeout exception in get_move()')
 
         # Return the best move from the last completed search iteration
-        raise NotImplementedError
+        print("OHBABY")
+        return best_move
 
     def minimax(self, game, depth, maximizing_player=True):
         """Implement the minimax search algorithm as described in the lectures.
@@ -174,7 +193,7 @@ class CustomPlayer:
         
         squares = game.get_legal_moves()
         if not squares:
-            return -999, (-1,-1)
+            return -float('inf'), (-1,-1)
         choices = [game.forecast_move(move) for move in squares]
               
         # Set which player the agent is maximizing for, so that
@@ -192,13 +211,21 @@ class CustomPlayer:
         return max(zip(outcomes, squares), key=lambda x: x[0])
     
     def min_val(self, game, maxDepth, target):
+        if self.time_left() < self.TIMER_THRESHOLD:
+            raise Timeout()
         choices = [game.forecast_move(move) for move in game.get_legal_moves()]
+        if not choices:
+            return float('inf')
         if choices[0].move_count - 2 >= maxDepth:
             return min(self.score(choice, target) for choice in choices)
         return min(self.max_val(choice, maxDepth, target) for choice in choices)
     
     def max_val(self, game, maxDepth, target):
+        if self.time_left() < self.TIMER_THRESHOLD:
+            raise Timeout()
         choices = [game.forecast_move(move) for move in game.get_legal_moves()]
+        if not choices:
+            return -float('inf')
         if choices[0].move_count - 2 >= maxDepth:
             return max(self.score(choice, target) for choice in choices)
         return max(self.min_val(choice, maxDepth, target) for choice in choices)
@@ -251,7 +278,8 @@ class CustomPlayer:
             
 
     def max_alpha_beta(self, game, depth, a, b):
-        
+        if self.time_left() < self.TIMER_THRESHOLD:
+            raise Timeout()
         moves = game.get_legal_moves()
         if not moves:
             return -float('inf'), (-1,-1)
@@ -280,7 +308,8 @@ class CustomPlayer:
         return a, best_move
     
     def min_alpha_beta(self, game, depth, a, b):
-        
+        if self.time_left() < self.TIMER_THRESHOLD:
+            raise Timeout()
         moves = game.get_legal_moves()
         if not moves:
             return float('inf'), (-2,-2)
