@@ -133,8 +133,6 @@ class CustomPlayer:
             
             while(self.iterative or depth < self.search_depth):
                 
-                depth += 1
-                print('DEPTH is ' + str(depth))
                 for move in legal_moves:
                     state = game.forecast_move(move)
                     score, _ = method_map[self.method](state, depth, 
@@ -142,6 +140,7 @@ class CustomPlayer:
                     if score > best_score:
                         print(score, move)
                         best_score, best_move = score, move
+                depth += 1
             return best_move   
             # The search method call (alpha beta or minimax) should happen in
             # here in order to avoid timeout. The try/except block will
@@ -151,8 +150,8 @@ class CustomPlayer:
 
         except Timeout:
             # Handle any actions required at timeout, if necessary
-            print('dude--reached Timeout exception in get_move()')
-
+            print('bestmove equals {}'.format(best_move))
+            return best_move
         # Return the best move from the last completed search iteration
         print("OHBABY")
         return best_move
@@ -191,11 +190,6 @@ class CustomPlayer:
         if self.time_left() < self.TIMER_THRESHOLD:
             raise Timeout()
         
-        squares = game.get_legal_moves()
-        if not squares:
-            return -float('inf'), (-1,-1)
-        choices = [game.forecast_move(move) for move in squares]
-              
         # Set which player the agent is maximizing for, so that
         #    agent can calculate utility of moves correctly
         if maximizing_player:
@@ -203,13 +197,24 @@ class CustomPlayer:
         else:
             boss = game.inactive_player
             
-        if choices[0].move_count - 2 >= depth:
-            outcomes = [self.score(choice, boss) for choice in choices]
-        else:
-            outcomes = [self.min_val(choice, depth, boss) for choice in choices]
+        if depth == 0:
+            return self.score(game, boss), None
+        # if last move is needed instead of None:  game.__last_player_move__[game.inactive_player]
+            
+        moves = game.get_legal_moves()
+        if not moves:
+            return game.utility(boss), (-1,-1)
         
-        return max(zip(outcomes, squares), key=lambda x: x[0])
-    
+        choices = [game.forecast_move(move) for move in moves]
+        scores = [self.minimax(choice, depth-1, not maximizing_player)[0]
+                          for choice in choices]
+        
+        if maximizing_player:
+            return max(zip(scores, moves), key=lambda x: x[0])
+        else:
+            return min(zip(scores, moves), key=lambda x: x[0])
+            
+
     def min_val(self, game, maxDepth, target):
         if self.time_left() < self.TIMER_THRESHOLD:
             raise Timeout()
