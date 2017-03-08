@@ -9,6 +9,7 @@ relative strength using tournament.py and include the results in your report.
 import random
 import isolation
 
+
 class Timeout(Exception):
     """Subclass base exception for code clarity."""
     pass
@@ -36,9 +37,19 @@ def custom_score(game, player):
     float
         The heuristic value of the current game state to the specified player.
     """
+    if game.is_loser(player):
+        return float("-inf")
 
-    # TODO: finish this function!
-    raise NotImplementedError
+    if game.is_winner(player):
+        return float("inf")
+    
+    cx, cy = game.width / 2, game.height / 2
+    dx = game.get_player_location(player)[1] - cx
+    dy = game.get_player_location(player)[0] - cy
+    open_moves = len(game.get_legal_moves(player))
+    open_enemy = len(game.get_legal_moves(game.get_opponent(player)))
+    return -(dx ** 2) -(dy ** 2) - (open_enemy ** 2) + (open_moves ** 2)
+                                 
 
 
 class CustomPlayer:
@@ -72,7 +83,7 @@ class CustomPlayer:
     """
 
     def __init__(self, search_depth=3, score_fn=custom_score,
-                 iterative=True, method='minimax', timeout=10.):
+                 iterative=True, method='alphabeta', timeout=10.):
         self.search_depth = search_depth
         self.iterative = iterative
         self.score = score_fn
@@ -138,7 +149,6 @@ class CustomPlayer:
                     score, _ = method_map[self.method](state, depth, 
                                          maximizing_player=False)
                     if score > best_score:
-                        print(score, move)
                         best_score, best_move = score, move
                 depth += 1
             return best_move   
@@ -150,10 +160,8 @@ class CustomPlayer:
 
         except Timeout:
             # Handle any actions required at timeout, if necessary
-            print('bestmove equals {}'.format(best_move))
             return best_move
         # Return the best move from the last completed search iteration
-        print("OHBABY")
         return best_move
 
     def minimax(self, game, depth, maximizing_player=True):
@@ -317,10 +325,10 @@ class CustomPlayer:
             raise Timeout()
         moves = game.get_legal_moves()
         if not moves:
-            return float('inf'), (-2,-2)
+            return float('inf'), (-1,-1)
         
         if depth == 1:
-            best_score, best_move = b, (-2,-2)
+            best_score, best_move = b, (-1,-1)
             for move in moves:
                 board = game.forecast_move(move)
                 score = self.score(board, board.active_player)
@@ -332,7 +340,7 @@ class CustomPlayer:
             return best_score, best_move
         
 #        best_score = b
-        best_move = (-2,-2)
+        best_move = (-1,-1)
         for move in moves:
             board = game.forecast_move(move)
             score, square = self.max_alpha_beta(board, depth-1, a, b)
