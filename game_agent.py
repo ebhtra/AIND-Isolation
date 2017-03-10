@@ -6,8 +6,8 @@ augment the test suite with your own test cases to further test your code.
 You must test your agent's strength against a set of agents with known
 relative strength using tournament.py and include the results in your report.
 """
-import random
-import isolation
+#import random
+#import isolation
 
 
 class Timeout(Exception):
@@ -43,12 +43,15 @@ def custom_score(game, player):
     if game.is_winner(player):
         return float("inf")
     
-    cx, cy = game.width / 2, game.height / 2
-    dx = game.get_player_location(player)[1] - cx
-    dy = game.get_player_location(player)[0] - cy
+#    cx, cy = game.width / 2, game.height / 2
+#    dx = game.get_player_location(player)[1] - cx
+#    dy = game.get_player_location(player)[0] - cy
     open_moves = len(game.get_legal_moves(player))
     open_enemy = len(game.get_legal_moves(game.get_opponent(player)))
-    return -(dx ** 2) -(dy ** 2) - (open_enemy ** 2) + (open_moves ** 2)
+#    if game.move_count < 10:
+#        return -(dx ** 2) -(dy ** 2)
+#    else:
+    return open_moves - 1.5 * open_enemy
                                  
 
 
@@ -83,7 +86,7 @@ class CustomPlayer:
     """
 
     def __init__(self, search_depth=3, score_fn=custom_score,
-                 iterative=True, method='alphabeta', timeout=10.):
+                 iterative=True, method='minimax', timeout=10.):
         self.search_depth = search_depth
         self.iterative = iterative
         self.score = score_fn
@@ -129,29 +132,58 @@ class CustomPlayer:
 
         self.time_left = time_left
         
-        if not legal_moves:
-            return (-1,-1)
-        best_move = legal_moves[0]
-        best_score = -float('inf')
-        depth = 0
-        method_map = {'minimax': self.minimax, 'alphabeta': self.alphabeta}
+        if not legal_moves:  
+            return (-1,-1)  # game over Sentinel
+        # List the game boards resulting from each legal move.
+        # Note that the active player has been switched in the new board!
+        states = [game.forecast_move(move) for move in legal_moves]
+        scores = [self.score(state, state.inactive_player) for state in states]
+        # Rank the utility of each branch
+        ranked_moves = sorted(zip(scores, legal_moves), reverse=True)
+        # Keep the initial best move along with its score. This will continue
+        #   to update during this method, depth by depth, and be returned
+        #   upon exhaustion of search or time.
+        last_best = ranked_moves[0]
+        # Quick check to see if the best move is a game winner.
+        if last_best[0] == float('inf'):
+            return last_best[1]
         
-        # Perform any required initializations, including selecting an initial
-        # move from the game board (i.e., an opening book), or returning
-        # immediately if there are no legal moves
+        depth = 1  # Already explored one depth
+        # Map string arguments to the appropriate function calls
+        methods = {'minimax': self.minimax, 'alphabeta': self.alphabeta}
+        # 'unchanged' will be used as a counter to gauge quiescence in order
+        #      to abort a search that seems to have run its course
+        unchanged = 0
+        # TODO: Perform any required initializations, including selecting an initial
+        # move from the game board (i.e., an opening book)
 
         try:
-            
-            while(self.iterative or depth < self.search_depth):
+            # The loop exits are (not @iterative AND 'depth' > @search_depth)
+            #                       OR search result has stopped progressing
+            while((self.iterative or depth < self.search_depth) and 
+                  unchanged < 6):
                 
-                for move in legal_moves:
-                    state = game.forecast_move(move)
-                    score, _ = method_map[self.method](state, depth, 
-                                         maximizing_player=False)
-                    if score > best_score:
-                        best_score, best_move = score, move
+                unchanged += 1
+                
+                new_scores = []  # This stores new depth scores for each move
+                for rm in ranked_moves:
+                    score, _ = methods[self.method](game.forecast_move(rm[1]),
+                                         depth, maximizing_player=False)
+                    if score == float('inf'):
+                        return rm[1]
+                    if score == -float('inf'):
+                        ranked_moves.remove(rm)
+                        if not ranked_moves:
+                            return last_best[1]
+                    new_scores.append((score, rm[1]))
+                
+                new_scores = sorted(new_scores, reverse=True)
+                last_best = new_scores[0]
+                if ranked_moves[0] != new_scores[0]:
+                    unchanged = 0
+                ranked_moves = new_scores
                 depth += 1
-            return best_move   
+            
             # The search method call (alpha beta or minimax) should happen in
             # here in order to avoid timeout. The try/except block will
             # automatically catch the exception raised by the search method
@@ -160,9 +192,11 @@ class CustomPlayer:
 
         except Timeout:
             # Handle any actions required at timeout, if necessary
-            return best_move
+            
+            return last_best[1]
         # Return the best move from the last completed search iteration
-        return best_move
+#        
+        return last_best[1]
 
     def minimax(self, game, depth, maximizing_player=True):
         """Implement the minimax search algorithm as described in the lectures.
@@ -207,7 +241,7 @@ class CustomPlayer:
             
         if depth == 0:
             return self.score(game, boss), None
-        # if last move is needed instead of None:  game.__last_player_move__[game.inactive_player]
+        # if last move is needed instead of None:  game.get_player_location(game.inactive_player)
             
         moves = game.get_legal_moves()
         if not moves:
@@ -218,30 +252,10 @@ class CustomPlayer:
                           for choice in choices]
         
         if maximizing_player:
-            return max(zip(scores, moves), key=lambda x: x[0])
+            return max(zip(scores, moves))
         else:
-            return min(zip(scores, moves), key=lambda x: x[0])
+            return min(zip(scores, moves))
             
-
-    def min_val(self, game, maxDepth, target):
-        if self.time_left() < self.TIMER_THRESHOLD:
-            raise Timeout()
-        choices = [game.forecast_move(move) for move in game.get_legal_moves()]
-        if not choices:
-            return float('inf')
-        if choices[0].move_count - 2 >= maxDepth:
-            return min(self.score(choice, target) for choice in choices)
-        return min(self.max_val(choice, maxDepth, target) for choice in choices)
-    
-    def max_val(self, game, maxDepth, target):
-        if self.time_left() < self.TIMER_THRESHOLD:
-            raise Timeout()
-        choices = [game.forecast_move(move) for move in game.get_legal_moves()]
-        if not choices:
-            return -float('inf')
-        if choices[0].move_count - 2 >= maxDepth:
-            return max(self.score(choice, target) for choice in choices)
-        return max(self.min_val(choice, maxDepth, target) for choice in choices)
 
     def alphabeta(self, game, depth, alpha=float("-inf"), beta=float("inf"), maximizing_player=True):
         """Implement minimax search with alpha-beta pruning as described in the
