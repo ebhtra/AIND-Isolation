@@ -134,56 +134,51 @@ class CustomPlayer:
         
         if not legal_moves:  
             return (-1,-1)  # game over Sentinel
-        # List the game boards resulting from each legal move.
-        # Note that the active player has been switched in the new board!
-        states = [game.forecast_move(move) for move in legal_moves]
-        scores = [self.score(state, state.inactive_player) for state in states]
-        # Rank the utility of each branch
-        ranked_moves = sorted(zip(scores, legal_moves), reverse=True)
-        # Keep the initial best move along with its score. This will continue
-        #   to update during this method, depth by depth, and be returned
-        #   upon exhaustion of search or time.
-        last_best = ranked_moves[0]
-        # Quick check to see if the best move is a game winner.
-        if last_best[0] == float('inf'):
-            return last_best[1]
+            
+        # Get a value to return in case early timeout.
+        # This var will store the best move after each deeper iteration.
+        last_best = legal_moves[0]
         
-        depth = 1  # Already explored one depth
         # Map string arguments to the appropriate function calls
         methods = {'minimax': self.minimax, 'alphabeta': self.alphabeta}
+        
         # 'unchanged' will be used as a counter to gauge quiescence in order
         #      to abort a search that seems to have run its course
         unchanged = 0
+        
+        depth = 0
         # TODO: Perform any required initializations, including selecting an initial
         # move from the game board (i.e., an opening book)
 
         try:
-            # The loop exits are (not @iterative AND 'depth' > @search_depth)
-            #                       OR search result has stopped progressing
+ 
             while((self.iterative or depth < self.search_depth) and 
                   unchanged < 6):
                 
                 unchanged += 1
-                
                 new_scores = []  # This stores new depth scores for each move
-                for rm in ranked_moves:
-                    score, _ = methods[self.method](game.forecast_move(rm[1]),
-                                         depth, maximizing_player=False)
+                for move in legal_moves:
+                    new_board = game.forecast_move(move)
+                    f = methods[self.method]
+                    score, _ = f(new_board, depth + (f==self.alphabeta), 
+                                 maximizing_player=False)
                     if score == float('inf'):
-                        return rm[1]
-                    if score == -float('inf'):
-                        ranked_moves.remove(rm)
-                        if not ranked_moves:
-                            return last_best[1]
-                    new_scores.append((score, rm[1]))
-                
-                new_scores = sorted(new_scores, reverse=True)
-                last_best = new_scores[0]
-                if ranked_moves[0] != new_scores[0]:
+                        return move
+                    elif score == -float('inf'):
+                        legal_moves.remove(move)
+                        if not legal_moves:
+                            return last_best[-1]
+                    else:
+                        new_scores.append((score, move))
+                if not new_scores:
+                    return last_best[-1]
+                new_best = max(new_scores)
+                if new_best[0] != last_best[0]:
                     unchanged = 0
-                ranked_moves = new_scores
+                last_best = new_best
                 depth += 1
-            
+                
+            return last_best[-1]
             # The search method call (alpha beta or minimax) should happen in
             # here in order to avoid timeout. The try/except block will
             # automatically catch the exception raised by the search method
@@ -192,11 +187,10 @@ class CustomPlayer:
 
         except Timeout:
             # Handle any actions required at timeout, if necessary
-            
-            return last_best[1]
+            return last_best[-1]
         # Return the best move from the last completed search iteration
 #        
-        return last_best[1]
+        return last_best[-1]
 
     def minimax(self, game, depth, maximizing_player=True):
         """Implement the minimax search algorithm as described in the lectures.
