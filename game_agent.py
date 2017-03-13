@@ -43,15 +43,15 @@ def custom_score(game, player):
     if game.is_winner(player):
         return float("inf")
     
-#    cx, cy = game.width / 2, game.height / 2
-#    dx = game.get_player_location(player)[1] - cx
-#    dy = game.get_player_location(player)[0] - cy
+    cx, cy = game.width / 2, game.height / 2
+    dx = game.get_player_location(player)[1] + 0.5 - cx
+    dy = game.get_player_location(player)[0] + 0.5 - cy
     open_moves = len(game.get_legal_moves(player))
     open_enemy = len(game.get_legal_moves(game.get_opponent(player)))
-#    if game.move_count < 10:
-#        return -(dx ** 2) -(dy ** 2)
-#    else:
-    return open_moves - 1.5 * open_enemy
+    if game.move_count < game.width * game.height / 3.5:
+        return -(dx ** 2) -(dy ** 2)
+    else:
+        return 1.3 * open_moves - open_enemy
                                  
 
 
@@ -151,22 +151,29 @@ class CustomPlayer:
         # move from the game board (i.e., an opening book)
 
         try:
- 
+            choices = legal_moves[:]
+            # Exit loop if iterative is set False AND depth reaches set limit,
+            #    OR if best score has stayed the same for several depths
             while((self.iterative or depth < self.search_depth) and 
-                  unchanged < 6):
-                
+                                                                unchanged < 7):
                 unchanged += 1
                 new_scores = []  # This stores new depth scores for each move
-                for move in legal_moves:
+
+                for move in choices:
                     new_board = game.forecast_move(move)
-                    f = methods[self.method]
-                    score, _ = f(new_board, depth + (f==self.alphabeta), 
-                                 maximizing_player=False)
-                    if score == float('inf'):
+                    f = methods[self.method]  # Translate string to function.
+                    # Use the recursive search function to predict the score
+                    #     for this branch/move.
+                    score, _ = f(new_board, depth, maximizing_player=False)
+                    if score == float('inf'):  # This move is a game winner.
                         return move
-                    elif score == -float('inf'):
-                        legal_moves.remove(move)
-                        if not legal_moves:
+                    elif score == -float('inf'): # This move is a game loser.
+                        # Will be a loser for all successively deeper searches,
+                        #    so prune it now.
+                        choices.remove(move)
+                        if not choices:
+                            # All moves will lose, but might as well hope
+                            #    opponent doesn't capitalize on that.
                             return last_best[-1]
                     else:
                         new_scores.append((score, move))
@@ -292,71 +299,45 @@ class CustomPlayer:
         if self.time_left() < self.TIMER_THRESHOLD:
             raise Timeout()
         
+        # Set which player the agent is maximizing for, so that
+        #    agent can calculate utility of moves correctly
         if maximizing_player:
-            return self.max_alpha_beta(game, depth, alpha, beta)
-
-        return self.min_alpha_beta(game, depth, alpha, beta)
+            boss = game.active_player
+            #best_score = alpha
+            best_score = -float('inf')
+        else:
+            boss = game.inactive_player
+            #best_score = beta
+            best_score = float('inf')
             
-
-    def max_alpha_beta(self, game, depth, a, b):
-        if self.time_left() < self.TIMER_THRESHOLD:
-            raise Timeout()
+        if depth == 0:
+            return self.score(game, boss), None
+            
         moves = game.get_legal_moves()
         if not moves:
-            return -float('inf'), (-1,-1)
+            return game.utility(boss), (-1,-1)
         
-        if depth == 1:
-            best_score, best_move = a, (-1,-1)
-            for move in moves:
-                board = game.forecast_move(move)
-                score = self.score(board, board.inactive_player)
-                if score >= b:
-                    return score, move
-                if score > best_score:
-                    best_score, best_move = score, move
-                    a = best_score
-            return best_score, best_move
-        
-#        best_score = a
         best_move = (-1,-1)
+        
         for move in moves:
             board = game.forecast_move(move)
-            score, _ = self.min_alpha_beta(board, depth-1, a, b)
-            if score >= b:
-                return score, move
-            if score > a:
-                a, best_move = score, move
-        return a, best_move
-    
-    def min_alpha_beta(self, game, depth, a, b):
-        if self.time_left() < self.TIMER_THRESHOLD:
-            raise Timeout()
-        moves = game.get_legal_moves()
-        if not moves:
-            return float('inf'), (-1,-1)
-        
-        if depth == 1:
-            best_score, best_move = b, (-1,-1)
-            for move in moves:
-                board = game.forecast_move(move)
-                score = self.score(board, board.active_player)
-                if score <= a:
+            score, _ = self.alphabeta(board, depth-1, alpha, beta,
+                                   not maximizing_player)
+            
+            if maximizing_player:
+                if score >= beta:
                     return score, move
-                if score < best_score:
+                elif score > alpha:
+                    alpha, best_score, best_move = score, score, move
+                elif score > best_score:
                     best_score, best_move = score, move
-                    b = best_score
-            return best_score, best_move
+            else:
+                if score <= alpha:
+                    return score, move
+                elif score < beta:
+                    beta, best_score, best_move = score, score, move
+                elif score < best_score:
+                    best_score, best_move = score, move
+        return best_score, best_move
         
-#        best_score = b
-        best_move = (-1,-1)
-        for move in moves:
-            board = game.forecast_move(move)
-            score, square = self.max_alpha_beta(board, depth-1, a, b)
-            if score <= a:
-                return score, square
-            if score < b:
-                b, best_move = score, square
-        return b, best_move
-    
-                
-#   
+            
