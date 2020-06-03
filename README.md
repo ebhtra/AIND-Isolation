@@ -1,3 +1,5 @@
+# This project was part of the Udacity AI nanodegree program.
+My work on it is mostly contained in `game_agent.py`, where I implemented an efficient version of alpha-beta with iterative deepening, and combined it with a custom heuristic game state scoring function to create an agent that was good enough to place 5th out of hundreds of agents created worldwide, in the tournament. The best way to improve this agent from its current implementation is probably to cache game states so that the look-ahead capabilities provided by the heuristic function are able to iterate deeper in the alpha-beta call, by pruning previously seen bad moves more quickly.
 
 # Build a Game-playing Agent
 
